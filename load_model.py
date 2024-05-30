@@ -2,7 +2,6 @@ import accelerate
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 
-TOP_LOGITS_K = 5
 
 
 def get_model(model_name):
@@ -12,7 +11,7 @@ def get_model(model_name):
     return model, tokenizer
 
 
-def step_forward(model, tokenizer, prompt, decoding=True):
+def step_forward(model, tokenizer, prompt, decoding=True, k_indices=5):
     inputs = tokenizer(prompt, return_tensors="pt")
     inputs.to(model.device)
     input_ids = inputs['input_ids']
@@ -31,7 +30,7 @@ def step_forward(model, tokenizer, prompt, decoding=True):
             layer_output = norm(r)
             logits = lm_head(layer_output)
             next_token_logits = logits[:, -1, :]
-            top_logits_k = TOP_LOGITS_K
+            top_logits_k = k_indices
             top_values, top_indices = torch.topk(next_token_logits, top_logits_k, dim=-1)
             decoded_texts = [tokenizer.decode([idx], skip_special_tokens=False) for idx in top_indices.squeeze().tolist()]
             top_values = top_values.detach().cpu()

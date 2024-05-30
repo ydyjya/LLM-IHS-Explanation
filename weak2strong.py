@@ -1,4 +1,4 @@
-from load_data import get_data
+from load_data import get_data, load_conv
 from load_model import get_model, step_forward
 import numpy as np
 from w2s_utils import get_layer
@@ -8,16 +8,24 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import classification_report
 from sklearn.preprocessing import StandardScaler
 import accelerate
+from visualization import topk_intermediate_confidence_heatmap, accuracy_line
+
 
 norm_prompt_path = './exp_data/normal_prompt.csv'
 jailbreak_prompt_path = './exp_data/malicious_prompt.csv'
 malicious_prompt_path = './exp_data/jailbreak_prompt.csv'
 
 
-def load_exp_data(shuffle_seed=None):
+def load_exp_data(shuffle_seed=None, use_conv=False, model_name=None):
     normal_inputs = get_data(norm_prompt_path, shuffle_seed)
     malicious_inputs = get_data(jailbreak_prompt_path, shuffle_seed)
     jailbreak_inputs = get_data(malicious_prompt_path, shuffle_seed)
+    if use_conv and model_name is None:
+        raise ValueError("please set model name for load")
+    if use_conv:
+        normal_inputs = [load_conv(model_name, _) for _ in normal_inputs]
+        malicious_inputs = [load_conv(model_name, _) for _ in malicious_inputs]
+        jailbreak_inputs = [load_conv(model_name, _) for _ in jailbreak_inputs]
     return normal_inputs, malicious_inputs, jailbreak_inputs
 
 
@@ -77,6 +85,7 @@ class Weak2StrongClassifier:
 class Weak2StrongExplanation:
     def __init__(self, model_name, layer_nums=32, return_report=True, return_visual=True):
         self.model, self.tokenizer = get_model(model_name)
+        self.model_name = model_name
         self.layer_sums = layer_nums + 1
         self.forward_info = {}
         self.return_report = return_report
@@ -91,12 +100,11 @@ class Weak2StrongExplanation:
             last_hs = [hs[:, -1, :] for hs in list_hs]
             self.forward_info[_ + offset] = {"hidden_states": last_hs, "top-value_pair": tl_pair, "label": class_label}
 
-    def explain(self, datasets, classify_list=None, debug=True):
+    def explain(self, datasets, classify_list=None, debug=True, accuracy=True):
+        self.forward_info = {}
         if classify_list is None:
             classify_list = ["svm", "mlp"]
         forward_info = {}
-        accelerator = accelerate.Accelerator()
-        accelerator.prepare(self.model, self.tokenizer)
         if isinstance(datasets, list):
             for class_num, dataset in enumerate(datasets):
                 self.get_forward_info(dataset, class_num, debug=debug)
@@ -122,6 +130,11 @@ class Weak2StrongExplanation:
         if not self.return_visual:
             return
         
-        for classifier, layers_rep in rep_dict.items():
-            for layer, rep in layers_rep.items():
-                print(rep['accuracy'])
+        if accuracy and classify_list != []:
+            accuracy_line(rep_dict, self.model_name)
+
+    def vis_heatmap(self, dataset, left=0, right=33, debug=True):
+        self.forward_info = {}
+        self.get_forward_info(dataset, 0, debug=debug)
+        topk_intermediate_confidence_heatmap(self.forward_info, left=left, right=right)
+            

@@ -42,7 +42,7 @@ def load_conv(model_name, goal):
     return conv.get_prompt()
 
 
-def get_data(file_path, shuffle_seed=None):
+def get_data(file_path, shuffle_seed=None, use_conv=False):
     data_df = pd.read_csv(file_path)
     data_list = []
     for i, r in data_df.iterrows():

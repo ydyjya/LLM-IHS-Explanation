@@ -6,3 +6,4 @@ Meta-Llama*
 *.ipynb_checkpoints*
 __pycache__
 .idea
+Llama-2-70b-*
