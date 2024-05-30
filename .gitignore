@@ -1,1 +1,8 @@
 ./exp_data/jailbreak_input
+.gitignore
+Mistral*
+Meta-Llama*
+*.ipynb
+*.ipynb_checkpoints*
+__pycache__
+.idea

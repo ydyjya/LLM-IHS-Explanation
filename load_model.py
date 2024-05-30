@@ -5,10 +5,8 @@ import torch
 TOP_LOGITS_K = 5
 
 
-def get_model(model_name, device="cuda:0"):
-    accelerator = accelerate.Accelerator()
-    model = AutoModelForCausalLM.from_pretrained(model_name, output_hidden_states=True, device_map="automap")
-    model.to(device)
+def get_model(model_name):
+    model = AutoModelForCausalLM.from_pretrained(model_name, output_hidden_states=True, device_map="auto")
     model.eval()
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     return model, tokenizer

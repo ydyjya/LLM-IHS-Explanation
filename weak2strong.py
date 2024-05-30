@@ -7,6 +7,7 @@ from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import classification_report
 from sklearn.preprocessing import StandardScaler
+import accelerate
 
 norm_prompt_path = './exp_data/normal_prompt.csv'
 jailbreak_prompt_path = './exp_data/malicious_prompt.csv'
@@ -21,8 +22,9 @@ def load_exp_data(shuffle_seed=None):
 
 
 class Weak2StrongClassifier:
-    def __init__(self, return_dict=False):
-        self.return_dict=return_dict
+    def __init__(self, return_visual=False, return_report=True):
+        self.return_report = return_report
+        self.return_visual = return_visual
 
     @staticmethod
     def _process_data(forward_info):
@@ -44,11 +46,11 @@ class Weak2StrongClassifier:
         svm_model.fit(X_train, y_train)
         y_pred = svm_model.predict(X_test)
         report = None
-        if not self.return_dict:
+        if self.return_report:
             print("SVM Test Classification Report:")
-            print(classification_report(y_test, y_pred))
-        else:
-            report = classification_report(y_test, y_pred)
+            print(classification_report(y_test, y_pred, zero_division=0.0))
+        if self.return_visual:
+            report = classification_report(y_test, y_pred, zero_division=0.0)
         return X_test, y_pred, report
 
     def mlp(self, forward_info):
@@ -64,35 +66,45 @@ class Weak2StrongClassifier:
         mlp.fit(X_train_scaled, y_train)
         y_pred = mlp.predict(X_test_scaled)
         report = None
-        if not self.return_dict:
-            print("SVM Test Classification Report:")
-            print(classification_report(y_test, y_pred))
-        else:
-            report = classification_report(y_test, y_pred)
+        if self.return_report:
+            print("MLP Test Classification Report:")
+            print(classification_report(y_test, y_pred, zero_division=0.0))
+        if self.return_visual:
+            report = classification_report(y_test, y_pred, zero_division=0.0)
         return X_test, y_pred, report
 
 
 class Weak2StrongExplanation:
-    def __init__(self, model_name, layer_nums=32):
+    def __init__(self, model_name, layer_nums=32, return_report=True, return_visual=True):
         self.model, self.tokenizer = get_model(model_name)
         self.layer_sums = layer_nums + 1
         self.forward_info = {}
+        self.return_report = return_report
+        self.return_visual = return_visual
 
-    def get_forward_info(self, inputs_dataset):
+    def get_forward_info(self, inputs_dataset, class_label, debug=True):
         offset = len(self.forward_info)
         for _, i in enumerate(inputs_dataset):
+            if debug and _ > 100:
+                break
             list_hs, tl_pair = step_forward(self.model, self.tokenizer, i)
             last_hs = [hs[:, -1, :] for hs in list_hs]
-            self.forward_info[_ + offset] = {"hidden_states": last_hs, "top-value_pair": tl_pair, "label": 0}
+            self.forward_info[_ + offset] = {"hidden_states": last_hs, "top-value_pair": tl_pair, "label": class_label}
 
-    def explain(self, dataset_list, classify_list=None):
+    def explain(self, datasets, classify_list=None, debug=True):
         if classify_list is None:
             classify_list = ["svm", "mlp"]
         forward_info = {}
-        for dataset in dataset_list:
-            self.get_forward_info(dataset)
-
-        classifier = Weak2StrongClassifier(return_dict=True)
+        accelerator = accelerate.Accelerator()
+        accelerator.prepare(self.model, self.tokenizer)
+        if isinstance(datasets, list):
+            for class_num, dataset in enumerate(datasets):
+                self.get_forward_info(dataset, class_num, debug=debug)
+        elif isinstance(datasets, dict):
+            for class_key, dataset in datasets.items():
+                self.get_forward_info(dataset, class_key, debug=debug)
+        
+        classifier = Weak2StrongClassifier(self.return_report, self.return_visual)
 
         rep_dict = {}
         if "svm" in classify_list:
