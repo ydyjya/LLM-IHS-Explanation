@@ -22,7 +22,7 @@ def load_exp_data(shuffle_seed=None):
 
 
 class Weak2StrongClassifier:
-    def __init__(self, return_visual=False, return_report=True):
+    def __init__(self, return_report=True, return_visual=False):
         self.return_report = return_report
         self.return_visual = return_visual
 
@@ -50,7 +50,7 @@ class Weak2StrongClassifier:
             print("SVM Test Classification Report:")
             print(classification_report(y_test, y_pred, zero_division=0.0))
         if self.return_visual:
-            report = classification_report(y_test, y_pred, zero_division=0.0)
+            report = classification_report(y_test, y_pred, zero_division=0.0, output_dict=True)
         return X_test, y_pred, report
 
     def mlp(self, forward_info):
@@ -70,7 +70,7 @@ class Weak2StrongClassifier:
             print("MLP Test Classification Report:")
             print(classification_report(y_test, y_pred, zero_division=0.0))
         if self.return_visual:
-            report = classification_report(y_test, y_pred, zero_division=0.0)
+            report = classification_report(y_test, y_pred, zero_division=0.0, output_dict=True)
         return X_test, y_pred, report
 
 
@@ -111,12 +111,17 @@ class Weak2StrongExplanation:
             rep_dict["svm"] = {}
             for _ in range(0, self.layer_sums):
                 x, y, rep = classifier.svm(get_layer(self.forward_info, _))
-                print(rep)
                 rep_dict["svm"][_] = rep
 
         if "mlp" in classify_list:
             rep_dict["mlp"] = {}
             for _ in range(0, self.layer_sums):
                 x, y, rep = classifier.mlp(get_layer(self.forward_info, _))
-                print(rep)
                 rep_dict["mlp"][_] = rep
+        
+        if not self.return_visual:
+            return
+        
+        for classifier, layers_rep in rep_dict.items():
+            for layer, rep in layers_rep.items():
+                print(rep['accuracy'])
