@@ -1,6 +1,7 @@
 from load_data import get_data, load_conv
 from load_model import get_model, step_forward
 import numpy as np
+import os
 from w2s_utils import get_layer
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
@@ -12,20 +13,23 @@ from visualization import topk_intermediate_confidence_heatmap, accuracy_line
 
 
 norm_prompt_path = './exp_data/normal_prompt.csv'
-jailbreak_prompt_path = './exp_data/malicious_prompt.csv'
-malicious_prompt_path = './exp_data/jailbreak_prompt.csv'
+jailbreak_prompt_path = './exp_data/jailbreak_prompt.csv'
+malicious_prompt_path = './exp_data/malicious_prompt.csv'
 
 
 def load_exp_data(shuffle_seed=None, use_conv=False, model_name=None):
     normal_inputs = get_data(norm_prompt_path, shuffle_seed)
-    malicious_inputs = get_data(jailbreak_prompt_path, shuffle_seed)
-    jailbreak_inputs = get_data(malicious_prompt_path, shuffle_seed)
+    malicious_inputs = get_data(malicious_prompt_path, shuffle_seed)
+    if os.path.exists(jailbreak_prompt_path):
+        jailbreak_inputs = get_data(jailbreak_prompt_path, shuffle_seed)
+    else:
+        jailbreak_inputs = None
     if use_conv and model_name is None:
         raise ValueError("please set model name for load")
     if use_conv:
         normal_inputs = [load_conv(model_name, _) for _ in normal_inputs]
         malicious_inputs = [load_conv(model_name, _) for _ in malicious_inputs]
-        jailbreak_inputs = [load_conv(model_name, _) for _ in jailbreak_inputs]
+        jailbreak_inputs = [load_conv(model_name, _) for _ in jailbreak_inputs] if jailbreak_inputs is not None else None
     return normal_inputs, malicious_inputs, jailbreak_inputs
 
 
@@ -100,10 +104,10 @@ class Weak2StrongExplanation:
             last_hs = [hs[:, -1, :] for hs in list_hs]
             self.forward_info[_ + offset] = {"hidden_states": last_hs, "top-value_pair": tl_pair, "label": class_label}
 
-    def explain(self, datasets, classify_list=None, debug=True, accuracy=True):
+    def explain(self, datasets, classifier_list=None, debug=True, accuracy=True):
         self.forward_info = {}
-        if classify_list is None:
-            classify_list = ["svm", "mlp"]
+        if classifier_list is None:
+            classifier_list = ["svm", "mlp"]
         forward_info = {}
         if isinstance(datasets, list):
             for class_num, dataset in enumerate(datasets):
@@ -115,13 +119,13 @@ class Weak2StrongExplanation:
         classifier = Weak2StrongClassifier(self.return_report, self.return_visual)
 
         rep_dict = {}
-        if "svm" in classify_list:
+        if "svm" in classifier_list:
             rep_dict["svm"] = {}
             for _ in range(0, self.layer_sums):
                 x, y, rep = classifier.svm(get_layer(self.forward_info, _))
                 rep_dict["svm"][_] = rep
 
-        if "mlp" in classify_list:
+        if "mlp" in classifier_list:
             rep_dict["mlp"] = {}
             for _ in range(0, self.layer_sums):
                 x, y, rep = classifier.mlp(get_layer(self.forward_info, _))
@@ -130,11 +134,11 @@ class Weak2StrongExplanation:
         if not self.return_visual:
             return
         
-        if accuracy and classify_list != []:
+        if accuracy and classifier_list != []:
             accuracy_line(rep_dict, self.model_name)
 
-    def vis_heatmap(self, dataset, left=0, right=33, debug=True):
+    def vis_heatmap(self, dataset, left=0, right=33, debug=True, model_name=""):
         self.forward_info = {}
         self.get_forward_info(dataset, 0, debug=debug)
-        topk_intermediate_confidence_heatmap(self.forward_info, left=left, right=right)
+        topk_intermediate_confidence_heatmap(self.forward_info, left=left, right=right,model_name=model_name)
             
