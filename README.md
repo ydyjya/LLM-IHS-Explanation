@@ -1,6 +1,6 @@
 # Intermediate Hidden States Explanation (IHS-Explanation)
 
-This repository is the implementation of the paper, [How Alignment and Jailbreak Work: Explain LLM Safety through Intermediate Hidden States](www.arxiv.org).
+This repository is the implementation of the paper, [How Alignment and Jailbreak Work: Explain LLM Safety through Intermediate Hidden States](http://arxiv.org/abs/2406.05644).
 With this repository, you can swiftly deploy analysis for LLMs through intermediate hidden states and visualization results.
 
 ## Abstract
