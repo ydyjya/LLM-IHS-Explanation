@@ -4,10 +4,10 @@ import torch
 
 
 
-def get_model(model_name):
-    model = AutoModelForCausalLM.from_pretrained(model_name, output_hidden_states=True, device_map="auto")
+def get_model(model_path):
+    model = AutoModelForCausalLM.from_pretrained(model_path, output_hidden_states=True, device_map="auto")
     model.eval()
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
     return model, tokenizer
 
 

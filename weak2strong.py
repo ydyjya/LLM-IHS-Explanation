@@ -87,9 +87,9 @@ class Weak2StrongClassifier:
 
 
 class Weak2StrongExplanation:
-    def __init__(self, model_name, layer_nums=32, return_report=True, return_visual=True):
-        self.model, self.tokenizer = get_model(model_name)
-        self.model_name = model_name
+    def __init__(self, model_path, layer_nums=32, return_report=True, return_visual=True):
+        self.model, self.tokenizer = get_model(model_path)
+        self.model_name = model_path.split("/")[-1]
         self.layer_sums = layer_nums + 1
         self.forward_info = {}
         self.return_report = return_report
